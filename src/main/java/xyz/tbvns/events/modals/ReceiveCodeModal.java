@@ -12,7 +12,6 @@ import xyz.tbvns.database.DatabaseService;
 import xyz.tbvns.mail.MailVerification;
 
 import java.awt.*;
-import java.util.Optional;
 
 public class ReceiveCodeModal {
     @SubscribeEvent

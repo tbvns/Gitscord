@@ -4,7 +4,6 @@ import jakarta.mail.MessagingException;
 import org.apache.commons.lang3.RandomStringUtils;
 
 import java.util.HashMap;
-import java.util.Random;
 
 public class MailVerification {
     public static final HashMap<String, String> codes = new HashMap();

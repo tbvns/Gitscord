@@ -15,16 +15,19 @@ import java.util.concurrent.ConcurrentHashMap;
 @RestController
 @RequestMapping("/github-webhook")
 public class GitHubWebhookController {
-    public static final Map<Integer, Long> issueToThread = new ConcurrentHashMap<>();
+    public static final Map<Integer, Long> issueToThread = new ConcurrentHashMap<>(); // kept for compatibility
     private static final Logger log = LoggerFactory.getLogger(GitHubWebhookController.class);
 
     @Autowired
     private JDA jda;
 
-    private final ObjectMapper mapper = new ObjectMapper();
-
     @Autowired
     private GitHubAppService gitHubAppService;
+
+    @Autowired
+    private GitHubToDiscordBridge bridge;   // <-- injected bridge
+
+    private final ObjectMapper mapper = new ObjectMapper();
 
     @PostMapping
     public ResponseEntity<String> handleWebhook(
@@ -32,9 +35,10 @@ public class GitHubWebhookController {
             @RequestHeader(value = "X-Hub-Signature-256", required = false) String signature,
             @RequestBody String rawBody) {
 
+        System.out.println(rawBody);
+
         try {
             JsonNode root = mapper.readTree(rawBody);
-
             if ("installation".equals(event)) {
                 String action = root.path("action").asText();
                 JsonNode installation = root.path("installation");
@@ -50,11 +54,28 @@ public class GitHubWebhookController {
                 } else if ("deleted".equals(action)) {
                     gitHubAppService.handleInstallationDeleted(installationId);
                 }
+                return ResponseEntity.ok("ok");
+            }
+
+            switch (event) {
+                case "issues":
+                    bridge.handleIssueEvent(root);
+                    break;
+                case "issue_comment":
+                    bridge.handleIssueCommentEvent(root);
+                    break;
+                case "pull_request":
+                    bridge.handlePullRequestEvent(root);
+                    break;
+                case "ping":
+                    log.debug("Received ping event");
+                    break;
+                default:
+                    log.debug("Unhandled event type: {}", event);
             }
 
         } catch (Exception e) {
-            log.error("Webhook processing failed", e);
-            return ResponseEntity.internalServerError().body("error");
+            log.error("Webhook processing failed for event {}: {}", event, e.getMessage(), e);
         }
 
         return ResponseEntity.ok("ok");

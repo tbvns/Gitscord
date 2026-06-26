@@ -1,7 +1,8 @@
 package xyz.tbvns.database;
 
-import org.springframework.stereotype.Service;
 import jakarta.annotation.PostConstruct;
+import org.springframework.stereotype.Service;
+
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -38,6 +39,38 @@ public class DatabaseService {
                 )
             """);
             stmt.execute("CREATE INDEX IF NOT EXISTS idx_discord ON discord_github_links(discord_user_id)");
+
+            stmt.execute("""
+                CREATE TABLE IF NOT EXISTS repo_channel_links (
+                    repo_full_name   TEXT PRIMARY KEY,
+                    forum_channel_id TEXT NOT NULL,
+                    repo_tag_id      TEXT NOT NULL
+                )
+            """);
+
+            stmt.execute("""
+                CREATE TABLE IF NOT EXISTS repo_issue_tag_map (
+                    repo_full_name   TEXT NOT NULL,
+                    issue_label      TEXT NOT NULL,
+                    discord_tag_id   TEXT NOT NULL,
+                    PRIMARY KEY (repo_full_name, issue_label),
+                    FOREIGN KEY (repo_full_name) REFERENCES repo_channel_links(repo_full_name)
+                )
+            """);
+            stmt.execute("CREATE INDEX IF NOT EXISTS idx_issue_tag_repo ON repo_issue_tag_map(repo_full_name)");
+
+            stmt.execute("""
+                CREATE TABLE IF NOT EXISTS repo_issue_threads (
+                    repo_full_name TEXT NOT NULL,
+                    issue_number   INTEGER NOT NULL,
+                    thread_id      TEXT NOT NULL,
+                    is_pull_request INTEGER NOT NULL DEFAULT 0,
+                    created_at     TEXT NOT NULL,
+                    PRIMARY KEY (repo_full_name, issue_number)
+                )
+            """);
+            stmt.execute("CREATE INDEX IF NOT EXISTS idx_thread_id ON repo_issue_threads(thread_id)");
+            stmt.execute("CREATE INDEX IF NOT EXISTS idx_forum_channel ON repo_channel_links(forum_channel_id)");
         }
     }
 
@@ -75,7 +108,7 @@ public class DatabaseService {
     public String getLoginByEmail(String email) throws SQLException {
         try (Connection conn = getConnection();
              PreparedStatement ps = conn.prepareStatement(
-                "SELECT github_login FROM github_installations WHERE LOWER(github_email) = LOWER(?)")) {
+                     "SELECT github_login FROM github_installations WHERE LOWER(github_email) = LOWER(?)")) {
             ps.setString(1, email);
             ResultSet rs = ps.executeQuery();
             return rs.next() ? rs.getString("github_login") : null;
@@ -86,7 +119,7 @@ public class DatabaseService {
     public ResultSet getInstallationByLogin(String login) throws SQLException {
         Connection conn = getConnection();
         PreparedStatement ps = conn.prepareStatement(
-            "SELECT * FROM github_installations WHERE LOWER(github_login) = LOWER(?)");
+                "SELECT * FROM github_installations WHERE LOWER(github_login) = LOWER(?)");
         ps.setString(1, login);
         return ps.executeQuery(); // caller must close
     }
@@ -157,6 +190,188 @@ public class DatabaseService {
             ps.setString(1, login);
             ResultSet rs = ps.executeQuery();
             return rs.next() ? rs.getLong("github_user_id") : -1;
+        }
+    }
+
+    public void upsertRepoChannelLink(String repoFullName, String forumChannelId, String repoTagId) throws SQLException {
+        String sql = """
+            INSERT INTO repo_channel_links (repo_full_name, forum_channel_id, repo_tag_id)
+            VALUES (?, ?, ?)
+            ON CONFLICT(repo_full_name) DO UPDATE SET
+                forum_channel_id = excluded.forum_channel_id,
+                repo_tag_id      = excluded.repo_tag_id
+        """;
+        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, repoFullName);
+            ps.setString(2, forumChannelId);
+            ps.setString(3, repoTagId);
+            ps.executeUpdate();
+        }
+    }
+
+    public String getForumChannelForRepo(String repoFullName) throws SQLException {
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(
+                     "SELECT forum_channel_id FROM repo_channel_links WHERE repo_full_name = ?")) {
+            ps.setString(1, repoFullName);
+            ResultSet rs = ps.executeQuery();
+            return rs.next() ? rs.getString("forum_channel_id") : null;
+        }
+    }
+
+    public String getRepoTagId(String repoFullName) throws SQLException {
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(
+                     "SELECT repo_tag_id FROM repo_channel_links WHERE repo_full_name = ?")) {
+            ps.setString(1, repoFullName);
+            ResultSet rs = ps.executeQuery();
+            return rs.next() ? rs.getString("repo_tag_id") : null;
+        }
+    }
+
+    public void deleteRepoChannelLink(String repoFullName) throws SQLException {
+        // Remove child rows first to respect the FK constraint
+        deleteAllIssueTagsForRepo(repoFullName);
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(
+                     "DELETE FROM repo_channel_links WHERE repo_full_name = ?")) {
+            ps.setString(1, repoFullName);
+            ps.executeUpdate();
+        }
+    }
+
+    public void upsertIssueTagMapping(String repoFullName, String issueLabel, String discordTagId) throws SQLException {
+        String sql = """
+            INSERT INTO repo_issue_tag_map (repo_full_name, issue_label, discord_tag_id)
+            VALUES (?, ?, ?)
+            ON CONFLICT(repo_full_name, issue_label) DO UPDATE SET
+                discord_tag_id = excluded.discord_tag_id
+        """;
+        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, repoFullName);
+            ps.setString(2, issueLabel);
+            ps.setString(3, discordTagId);
+            ps.executeUpdate();
+        }
+    }
+
+    public String getDiscordTagForIssueLabel(String repoFullName, String issueLabel) throws SQLException {
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(
+                     "SELECT discord_tag_id FROM repo_issue_tag_map WHERE repo_full_name = ? AND issue_label = ?")) {
+            ps.setString(1, repoFullName);
+            ps.setString(2, issueLabel);
+            ResultSet rs = ps.executeQuery();
+            return rs.next() ? rs.getString("discord_tag_id") : null;
+        }
+    }
+
+    public java.util.Map<String, String> getIssueTagMappingsForRepo(String repoFullName) throws SQLException {
+        java.util.Map<String, String> map = new java.util.LinkedHashMap<>();
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(
+                     "SELECT issue_label, discord_tag_id FROM repo_issue_tag_map WHERE repo_full_name = ?")) {
+            ps.setString(1, repoFullName);
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) map.put(rs.getString("issue_label"), rs.getString("discord_tag_id"));
+        }
+        return map;
+    }
+
+    public void deleteIssueTagMapping(String repoFullName, String issueLabel) throws SQLException {
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(
+                     "DELETE FROM repo_issue_tag_map WHERE repo_full_name = ? AND issue_label = ?")) {
+            ps.setString(1, repoFullName);
+            ps.setString(2, issueLabel);
+            ps.executeUpdate();
+        }
+    }
+
+    public void deleteAllIssueTagsForRepo(String repoFullName) throws SQLException {
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(
+                     "DELETE FROM repo_issue_tag_map WHERE repo_full_name = ?")) {
+            ps.setString(1, repoFullName);
+            ps.executeUpdate();
+        }
+    }
+
+    public void upsertIssueThread(String repoFullName, int issueNumber, String threadId, boolean isPullRequest) throws SQLException {
+        String sql = """
+            INSERT INTO repo_issue_threads (repo_full_name, issue_number, thread_id, is_pull_request, created_at)
+            VALUES (?, ?, ?, ?, datetime('now'))
+            ON CONFLICT(repo_full_name, issue_number) DO UPDATE SET
+                thread_id = excluded.thread_id,
+                is_pull_request = excluded.is_pull_request
+        """;
+        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, repoFullName);
+            ps.setInt(2, issueNumber);
+            ps.setString(3, threadId);
+            ps.setInt(4, isPullRequest ? 1 : 0);
+            ps.executeUpdate();
+        }
+    }
+
+    /** Returns the Discord thread ID for a given repo+issue/PR number, or null if not tracked. */
+    public String getThreadIdForIssue(String repoFullName, int issueNumber) throws SQLException {
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(
+                     "SELECT thread_id FROM repo_issue_threads WHERE repo_full_name = ? AND issue_number = ?")) {
+            ps.setString(1, repoFullName);
+            ps.setInt(2, issueNumber);
+            ResultSet rs = ps.executeQuery();
+            return rs.next() ? rs.getString("thread_id") : null;
+        }
+    }
+
+    public void deleteIssueThread(String repoFullName, int issueNumber) throws SQLException {
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(
+                     "DELETE FROM repo_issue_threads WHERE repo_full_name = ? AND issue_number = ?")) {
+            ps.setString(1, repoFullName);
+            ps.setInt(2, issueNumber);
+            ps.executeUpdate();
+        }
+    }
+
+    public record ThreadIssueInfo(String repoFullName, int issueNumber, boolean isPullRequest) {}
+
+    public String getRepoForForumChannel(String forumChannelId) throws SQLException {
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(
+                     "SELECT repo_full_name FROM repo_channel_links WHERE forum_channel_id = ?")) {
+            ps.setString(1, forumChannelId);
+            ResultSet rs = ps.executeQuery();
+            return rs.next() ? rs.getString("repo_full_name") : null;
+        }
+    }
+
+    public ThreadIssueInfo getIssueFromThread(String threadId) throws SQLException {
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(
+                     "SELECT repo_full_name, issue_number, is_pull_request FROM repo_issue_threads WHERE thread_id = ?")) {
+            ps.setString(1, threadId);
+            ResultSet rs = ps.executeQuery();
+            if (rs.next()) {
+                return new ThreadIssueInfo(
+                        rs.getString("repo_full_name"),
+                        rs.getInt("issue_number"),
+                        rs.getInt("is_pull_request") == 1
+                );
+            }
+            return null;
+        }
+    }
+
+    public String getRepoForTag(String discordTagId) throws SQLException {
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(
+                     "SELECT repo_full_name FROM repo_channel_links WHERE repo_tag_id = ? LIMIT 1")) {
+            ps.setString(1, discordTagId);
+            ResultSet rs = ps.executeQuery();
+            return rs.next() ? rs.getString("repo_full_name") : null;
         }
     }
 }

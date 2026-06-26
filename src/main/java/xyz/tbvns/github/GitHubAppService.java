@@ -2,11 +2,10 @@ package xyz.tbvns.github;
 
 import jakarta.annotation.PostConstruct;
 import org.kohsuke.github.*;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
 import xyz.tbvns.database.DatabaseService;
 
 import java.nio.charset.StandardCharsets;
@@ -17,10 +16,10 @@ import java.security.PrivateKey;
 import java.security.Signature;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class GitHubAppService {
-    public static GitHubAppService instance;
     private static final Logger log = LoggerFactory.getLogger(GitHubAppService.class);
 
     private final String appId = System.getenv("GITHUB_APP_ID");
@@ -29,6 +28,7 @@ public class GitHubAppService {
     @Autowired
     private DatabaseService db;
 
+    public static GitHubAppService instance;
 
     @PostConstruct
     public void postConstruct() {
@@ -151,5 +151,96 @@ public class GitHubAppService {
             }
         }
         return result;
+    }
+
+    private GitHub getGitHubForLogin(String login) throws Exception {
+        long installationId = db.getInstallationIdForLogin(login);
+        if (installationId == -1) {
+            throw new IllegalArgumentException("No installation found for login: " + login);
+        }
+        GitHub appGitHub = new GitHubBuilder()
+                .withJwtToken(generateJwt())
+                .build();
+        GHAppInstallation installation = appGitHub.getApp().getInstallationById(installationId);
+        GHAppInstallationToken token = installation.createToken().create();
+        return new GitHubBuilder()
+                .withAppInstallationToken(token.getToken())
+                .build();
+    }
+
+    private GHRepository getRepositoryForLogin(String login, String repoFullName) throws Exception {
+        return getGitHubForLogin(login).getRepository(repoFullName);
+    }
+
+    public void addCommentToIssue(String repoFullName, int issueNumber, String message) {
+        try {
+            String owner = getOwnerFromRepo(repoFullName);
+            GHRepository repo = getRepositoryForLogin(owner, repoFullName);
+            repo.getIssue(issueNumber).comment(message);
+            log.info("Added comment to {}/#{}", repoFullName, issueNumber);
+        } catch (Exception e) {
+            log.error("Failed to comment on {}/#{}", repoFullName, issueNumber, e);
+            throw new RuntimeException("Could not add comment", e);
+        }
+    }
+
+    public void setIssueLabels(String repoFullName, int issueNumber, List<String> labels) {
+        try {
+            String owner = getOwnerFromRepo(repoFullName);
+            GHRepository repo = getRepositoryForLogin(owner, repoFullName);
+            repo.getIssue(issueNumber).setLabels(labels.toArray(new String[0]));
+            log.info("Set labels on {}/#{} to {}", repoFullName, issueNumber, labels);
+        } catch (Exception e) {
+            log.error("Failed to set labels on {}/#{}", repoFullName, issueNumber, e);
+            throw new RuntimeException("Could not set labels", e);
+        }
+    }
+
+    public List<String> getIssueLabels(String repoFullName, int issueNumber) {
+        try {
+            String owner = getOwnerFromRepo(repoFullName);
+            GHRepository repo = getRepositoryForLogin(owner, repoFullName);
+            List<String> labels = repo.getIssue(issueNumber)
+                    .getLabels()
+                    .stream()
+                    .map(GHLabel::getName)
+                    .collect(Collectors.toList());
+            log.info("Retrieved labels from {}/#{}: {}", repoFullName, issueNumber, labels);
+            return labels;
+        } catch (Exception e) {
+            log.error("Failed to get labels from {}/#{}", repoFullName, issueNumber, e);
+            throw new RuntimeException("Could not get labels", e);
+        }
+    }
+
+    public void updateIssueTitle(String repoFullName, int issueNumber, String newTitle) {
+        try {
+            String owner = getOwnerFromRepo(repoFullName);
+            GHRepository repo = getRepositoryForLogin(owner, repoFullName);
+            repo.getIssue(issueNumber).setTitle(newTitle);
+            log.info("Updated title of {}/#{} to '{}'", repoFullName, issueNumber, newTitle);
+        } catch (Exception e) {
+            log.error("Failed to update title on {}/#{}", repoFullName, issueNumber, e);
+            throw new RuntimeException("Could not update title", e);
+        }
+    }
+
+    private String getOwnerFromRepo(String repoFullName) {
+        return repoFullName.split("/")[0];
+    }
+
+    public GHIssue createIssue(String repoFullName, String title, String body) {
+        try {
+            String owner = getOwnerFromRepo(repoFullName);
+            GHRepository repo = getRepositoryForLogin(owner, repoFullName);
+            GHIssue issue = repo.createIssue(title)
+                    .body(body)
+                    .create();
+            log.info("Created issue #{} on {}: '{}'", issue.getNumber(), repoFullName, title);
+            return issue;
+        } catch (Exception e) {
+            log.error("Failed to create issue on {}", repoFullName, e);
+            throw new RuntimeException("Could not create issue", e);
+        }
     }
 }

@@ -4,14 +4,12 @@ import jakarta.mail.MessagingException;
 import net.dv8tion.jda.api.components.actionrow.ActionRow;
 import net.dv8tion.jda.api.components.buttons.Button;
 import net.dv8tion.jda.api.components.container.Container;
-import net.dv8tion.jda.api.components.label.Label;
 import net.dv8tion.jda.api.components.textdisplay.TextDisplay;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.hooks.SubscribeEvent;
 import net.dv8tion.jda.api.utils.messages.MessageCreateBuilder;
 import xyz.tbvns.Utils;
 import xyz.tbvns.mail.MailVerification;
-import xyz.tbvns.mail.Mailer;
 
 public class LinkCmdEvent {
     @SubscribeEvent
