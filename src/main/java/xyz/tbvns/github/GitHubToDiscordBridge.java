@@ -35,8 +35,6 @@ public class GitHubToDiscordBridge {
     @Autowired
     private JDA jda;
 
-    private DatabaseService db = DatabaseService.instance;
-
     public void handleIssueEvent(JsonNode root) {
         String action = root.path("action").asText();
         JsonNode issue = root.path("issue");
@@ -69,7 +67,7 @@ public class GitHubToDiscordBridge {
 
     private void onIssueOpened(String repoFullName, JsonNode issue) {
         try {
-            String forumChannelId = db.getForumChannelForRepo(repoFullName);
+            String forumChannelId = DatabaseService.instance.getForumChannelForRepo(repoFullName);
             if (forumChannelId == null) return; // repo not linked
 
             ForumChannel forum = jda.getForumChannelById(forumChannelId);
@@ -85,7 +83,7 @@ public class GitHubToDiscordBridge {
             String author = issue.path("user").path("login").asText("unknown");
             String authorUrl = issue.path("user").path("avatar_url").asText("unknown");
 
-            if (db.getThreadIdForIssue(repoFullName, number) != null) return;
+            if (DatabaseService.instance.getThreadIdForIssue(repoFullName, number) != null) return;
 
             List<ForumTag> tags = resolveTags(forum, repoFullName, issue);
 
@@ -104,7 +102,7 @@ public class GitHubToDiscordBridge {
             action.queue(post -> {
                 ThreadChannel thread = post.getThreadChannel();
                 try {
-                    db.upsertIssueThread(repoFullName, number, thread.getId(), false);
+                    DatabaseService.instance.upsertIssueThread(repoFullName, number, thread.getId(), false);
                 } catch (SQLException e) {
                     log.error("Failed to persist thread mapping for {}#{}", repoFullName, number, e);
                 }
@@ -160,17 +158,17 @@ public class GitHubToDiscordBridge {
     private void onIssueDeleted(String repoFullName, JsonNode issue) {
         int number = issue.path("number").asInt();
         try {
-            String threadId = db.getThreadIdForIssue(repoFullName, number);
+            String threadId = DatabaseService.instance.getThreadIdForIssue(repoFullName, number);
             if (threadId == null) return;
 
             ThreadChannel thread = jda.getThreadChannelById(threadId);
-            db.deleteIssueThread(repoFullName, number);
+            DatabaseService.instance.deleteIssueThread(repoFullName, number);
 
             if (thread != null) {
                 thread.delete().queue(null, err -> log.warn("Failed to delete thread {}", threadId, err));
             }
         } catch (SQLException e) {
-            log.error("DB error deleting thread mapping for {}#{}", repoFullName, number, e);
+            log.error("DatabaseService.instance error deleting thread mapping for {}#{}", repoFullName, number, e);
         }
     }
 
@@ -285,7 +283,7 @@ public class GitHubToDiscordBridge {
     /** Finds the live ThreadChannel for a repo+issue number, if tracked, and runs the consumer on it. */
     private void withThread(String repoFullName, int issueNumber, java.util.function.Consumer<ThreadChannel> consumer) {
         try {
-            String threadId = db.getThreadIdForIssue(repoFullName, issueNumber);
+            String threadId = DatabaseService.instance.getThreadIdForIssue(repoFullName, issueNumber);
             if (threadId == null) return;
             ThreadChannel thread = jda.getThreadChannelById(threadId);
             if (thread == null) {
@@ -305,7 +303,7 @@ public class GitHubToDiscordBridge {
     private void withThreadAndForum(String repoFullName, int issueNumber, ThreadAndForumConsumer consumer) {
         withThread(repoFullName, issueNumber, thread -> {
             try {
-                String forumChannelId = db.getForumChannelForRepo(repoFullName);
+                String forumChannelId = DatabaseService.instance.getForumChannelForRepo(repoFullName);
                 ForumChannel forum = forumChannelId != null ? jda.getForumChannelById(forumChannelId) : null;
                 if (forum == null) return;
                 consumer.accept(thread, forum);
@@ -319,7 +317,7 @@ public class GitHubToDiscordBridge {
     private List<ForumTag> resolveTags(ForumChannel forum, String repoFullName, JsonNode issue) {
         List<ForumTag> tags = new ArrayList<>();
         try {
-            String repoTagId = db.getRepoTagId(repoFullName);
+            String repoTagId = DatabaseService.instance.getRepoTagId(repoFullName);
             if (repoTagId != null && !repoTagId.isBlank()) {
                 ForumTag repoTag = forum.getAvailableTagById(repoTagId);
                 if (repoTag != null) tags.add(repoTag);
@@ -327,7 +325,7 @@ public class GitHubToDiscordBridge {
 
             for (JsonNode label : issue.path("labels")) {
                 String labelName = label.path("name").asText();
-                String discordTagId = db.getDiscordTagForIssueLabel(repoFullName, labelName);
+                String discordTagId = DatabaseService.instance.getDiscordTagForIssueLabel(repoFullName, labelName);
                 if (discordTagId == null) continue;
                 ForumTag tag = forum.getAvailableTagById(discordTagId);
                 if (tag != null && !tags.contains(tag)) tags.add(tag);
