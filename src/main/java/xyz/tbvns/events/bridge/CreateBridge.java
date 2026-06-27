@@ -9,6 +9,7 @@ import net.dv8tion.jda.api.hooks.SubscribeEvent;
 import net.dv8tion.jda.api.utils.messages.MessageCreateData;
 import org.kohsuke.github.GHIssue;
 import xyz.tbvns.GitscordEmoji;
+import xyz.tbvns.Main;
 import xyz.tbvns.Utils;
 import xyz.tbvns.database.DatabaseService;
 import xyz.tbvns.github.GitHubAppService;
@@ -44,6 +45,8 @@ public class CreateBridge {
                     throw new RuntimeException(e);
                 }
             }
+
+            if (Main.jda.getSelfUser().getId().equals(message.getAuthor().getId())) return;
 
             if (repo == null) return;
 
