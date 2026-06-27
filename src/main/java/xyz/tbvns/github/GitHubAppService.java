@@ -25,8 +25,7 @@ public class GitHubAppService {
     private final String appId = System.getenv("GITHUB_APP_ID");
     private final String privateKeyPath = System.getenv("GITHUB_APP_PRIVATE_KEY_PATH");
 
-    @Autowired
-    private DatabaseService db;
+    private DatabaseService db = DatabaseService.instance;
 
     public static GitHubAppService instance;
 

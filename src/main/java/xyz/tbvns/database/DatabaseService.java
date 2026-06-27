@@ -7,15 +7,14 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
-@Service
 public class DatabaseService {
     private static final String DB_URL = "jdbc:sqlite:gitscord.db";
 
     public static DatabaseService instance;
 
-    @PostConstruct
     public void init() throws SQLException {
         instance = this;
+
         try (Connection conn = getConnection(); Statement stmt = conn.createStatement()) {
             stmt.execute("""
                 CREATE TABLE IF NOT EXISTS github_installations (

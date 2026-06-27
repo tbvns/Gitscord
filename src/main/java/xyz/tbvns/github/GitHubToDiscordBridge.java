@@ -35,8 +35,7 @@ public class GitHubToDiscordBridge {
     @Autowired
     private JDA jda;
 
-    @Autowired
-    private DatabaseService db;
+    private DatabaseService db = DatabaseService.instance;
 
     public void handleIssueEvent(JsonNode root) {
         String action = root.path("action").asText();

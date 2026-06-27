@@ -25,7 +25,7 @@ public class GitHubWebhookController {
     private GitHubAppService gitHubAppService;
 
     @Autowired
-    private GitHubToDiscordBridge bridge;   // <-- injected bridge
+    private GitHubToDiscordBridge bridge;
 
     private final ObjectMapper mapper = new ObjectMapper();
 
@@ -34,8 +34,6 @@ public class GitHubWebhookController {
             @RequestHeader("X-GitHub-Event") String event,
             @RequestHeader(value = "X-Hub-Signature-256", required = false) String signature,
             @RequestBody String rawBody) {
-
-        System.out.println(rawBody);
 
         try {
             JsonNode root = mapper.readTree(rawBody);
