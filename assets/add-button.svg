@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="600mm"
+   height="200mm"
+   viewBox="0 0 600 200"
+   version="1.1"
+   id="svg1"
+   inkscape:version="1.4.4 (dcaf3e7d9e, 2026-05-05)"
+   sodipodi:docname="add-button.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#505050"
+     bordercolor="#eeeeee"
+     borderopacity="1"
+     inkscape:showpageshadow="0"
+     inkscape:pageopacity="0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#505050"
+     inkscape:document-units="mm"
+     inkscape:zoom="0.3514415"
+     inkscape:cx="1024.3526"
+     inkscape:cy="396.93662"
+     inkscape:window-width="1920"
+     inkscape:window-height="998"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="layer1" />
+  <defs
+     id="defs1">
+    <filter
+       inkscape:collect="always"
+       style="color-interpolation-filters:sRGB"
+       id="filter1"
+       x="-0.079623951"
+       y="-0.28554796"
+       width="1.1592479"
+       height="1.5710959">
+      <feGaussianBlur
+         inkscape:collect="always"
+         stdDeviation="20.73099"
+         id="feGaussianBlur1" />
+    </filter>
+  </defs>
+  <g
+     inkscape:label="Calque 1"
+     inkscape:groupmode="layer"
+     id="layer1">
+    <rect
+       style="fill:#2a69ae;fill-opacity:1;stroke-width:2.22108;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:7.8;-inkscape-stroke:none;paint-order:markers fill stroke;filter:url(#filter1)"
+       id="rect1-8"
+       width="624.86694"
+       height="174.24174"
+       x="-9.0342216"
+       y="14.137687"
+       rx="57.005493"
+       ry="57.005493"
+       transform="matrix(0.81025431,0,0,0.81025431,57.568686,19.213371)" />
+    <rect
+       style="fill:#2a33ae;fill-opacity:1;stroke-width:1.66248;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:7.8;-inkscape-stroke:none;paint-order:markers fill stroke"
+       id="rect1"
+       width="467.71289"
+       height="130.41994"
+       x="69.542793"
+       y="36.048588"
+       rx="42.66861"
+       ry="42.66861" />
+    <text
+       xml:space="preserve"
+       style="font-weight:300;font-size:64.4292px;line-height:18.8757px;font-family:'Aero Matics Light';-inkscape-font-specification:'Aero Matics Light,  Light';letter-spacing:0px;word-spacing:0px;writing-mode:lr-tb;direction:ltr;fill:#2a33ae;fill-opacity:1;stroke-width:1.45818;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:7.8;-inkscape-stroke:none;paint-order:markers fill stroke"
+       x="142.23552"
+       y="124.08068"
+       id="text1"><tspan
+         sodipodi:role="line"
+         id="tspan1"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:64.4292px;line-height:18.8757px;font-family:'Aero Matics';-inkscape-font-specification:'Aero Matics';fill:#ffffff;fill-opacity:1;stroke-width:1.45818"
+         x="142.23552"
+         y="124.08068">ADD THE BOT</tspan></text>
+  </g>
+</svg>
