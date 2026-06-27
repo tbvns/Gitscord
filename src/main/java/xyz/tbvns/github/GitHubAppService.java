@@ -25,8 +25,6 @@ public class GitHubAppService {
     private final String appId = System.getenv("GITHUB_APP_ID");
     private final String privateKeyPath = System.getenv("GITHUB_APP_PRIVATE_KEY_PATH");
 
-    private DatabaseService db = DatabaseService.instance;
-
     public static GitHubAppService instance;
 
     @PostConstruct
@@ -53,7 +51,7 @@ public class GitHubAppService {
             GHUser user = installationGitHub.getUser(login);
             String email = user.getEmail(); // public email, may be null
 
-            db.upsertInstallation(installationId, login, userId, email, installedAt);
+            DatabaseService.instance.upsertInstallation(installationId, login, userId, email, installedAt);
             log.info("Stored installation for {} (email: {})", login, email);
 
         } catch (Exception e) {
@@ -63,7 +61,7 @@ public class GitHubAppService {
 
     public void handleInstallationDeleted(long installationId) {
         try {
-            db.deleteInstallation(installationId);
+            DatabaseService.instance.deleteInstallation(installationId);
             log.info("Removed installation {}", installationId);
         } catch (Exception e) {
             log.error("Failed to delete installation {}", installationId, e);
@@ -76,7 +74,7 @@ public class GitHubAppService {
      */
     public String getGitHubLoginByEmail(String email) {
         try {
-            return db.getLoginByEmail(email);
+            return DatabaseService.instance.getLoginByEmail(email);
         } catch (Exception e) {
             log.error("DB lookup failed for email={}", email, e);
             return null;
@@ -115,7 +113,7 @@ public class GitHubAppService {
      * Works for both personal accounts and orgs.
      */
     public List<GHRepository> getReposForLogin(String login) throws Exception {
-        long installationId = db.getInstallationIdForLogin(login);
+        long installationId = DatabaseService.instance.getInstallationIdForLogin(login);
         if (installationId == -1) throw new IllegalArgumentException("No installation found for: " + login);
 
         GitHub appGitHub = new GitHubBuilder()
@@ -140,7 +138,7 @@ public class GitHubAppService {
      * Map key = github login, value = their repos.
      */
     public Map<String, List<GHRepository>> getReposForDiscordUser(String discordUserId) throws Exception {
-        List<String> logins = db.getGitHubLoginsForDiscord(discordUserId);
+        List<String> logins = DatabaseService.instance.getGitHubLoginsForDiscord(discordUserId);
         Map<String, List<GHRepository>> result = new LinkedHashMap<>();
         for (String login : logins) {
             try {
@@ -153,7 +151,7 @@ public class GitHubAppService {
     }
 
     private GitHub getGitHubForLogin(String login) throws Exception {
-        long installationId = db.getInstallationIdForLogin(login);
+        long installationId = DatabaseService.instance.getInstallationIdForLogin(login);
         if (installationId == -1) {
             throw new IllegalArgumentException("No installation found for login: " + login);
         }
